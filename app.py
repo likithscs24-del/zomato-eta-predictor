@@ -8,7 +8,9 @@ app = Flask(__name__)
 CORS(app)
  
 model = joblib.load('zomato_model.pkl')
- 
+order_mins = hour * 60 + 30  # order time in minutes since midnight (e.g. 13:30 → 810 mins)
+pickup_mins = order_mins + 10  # pickup ~10 mins after order
+prediction = max(10, round(float(prediction)))  # minimum realistic ETA (10 mins)
 # Encodings match exact LabelEncoder order used during training
 weather_map  = {'Cloudy': 0, 'Fog': 1, 'Sandstorms': 2, 'Stormy': 3, 'Sunny': 4, 'Windy': 5}
 traffic_map  = {'High': 0, 'Jam': 1, 'Low': 2, 'Medium': 3}
