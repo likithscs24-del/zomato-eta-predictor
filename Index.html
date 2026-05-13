@@ -594,7 +594,7 @@
     </div>
     <div class="header-right">
       <div class="pulse-dot"></div>
-      <div class="header-badge">ML Predictor v1.0</div>
+      <div class="header-badge">ML Predictor v2.0</div>
     </div>
   </div>
 </header>
@@ -838,17 +838,28 @@
 </div><!-- /wrap -->
 
 <script>
-const FLASK_URL = '/predict';
+// Auto-detect Flask URL: same origin in production, localhost in dev
+const FLASK_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? 'http://localhost:5000/predict'
+  : '/predict';
 
-function renderResults(eta, inputs) {
-  const mae = 3.89;
-  const low = Math.max(10, Math.round(eta - mae));
-  const high = Math.min(54, Math.round(eta + mae));
-  const pct = Math.max(0, Math.min(100, Math.round((1 - mae / eta) * 100)));
+function renderResults(eta, inputs, apiLow, apiHigh) {
+  // Use server-supplied bounds; fall back to ±MAE if missing
+  const mae  = 3.89;
+  const low  = (apiLow  != null) ? apiLow  : Math.max(10, Math.round(eta - mae));
+  const high = (apiHigh != null) ? apiHigh : Math.min(54, Math.round(eta + mae));
 
+  // Confidence: how narrow is the interval relative to the full range (10–54)?
+  // A tighter interval → higher confidence.
+  const fullRange   = 54 - 10;
+  const predRange   = Math.max(1, high - low);
+  const pct = Math.max(30, Math.min(98, Math.round((1 - predRange / fullRange) * 100 + 50)));
+
+  // Tier thresholds derived from actual delivery-time distribution:
+  // Express ≤ 18 min (left tail), Fast 19–24, Standard 25–33 (modal peak), Slow > 33
   let tier;
   if (eta <= 18) tier = 'Express';
-  else if (eta <= 25) tier = 'Fast';
+  else if (eta <= 24) tier = 'Fast';
   else if (eta <= 33) tier = 'Standard';
   else tier = 'Slow';
 
@@ -968,8 +979,11 @@ function renderResults(eta, inputs) {
     sentences.push(`It's a <span class="hi-pink">festival day</span>, which typically adds ~4 minutes due to increased demand and congestion.`);
 
   // multi delivery
-  if (parseInt(inputs.multi) >= 2)
-    sentences.push(`The rider has <span class="hi-orange">${inputs.multi} other deliveries</span> on this trip, adding meaningful delay.`);
+  const multiNum = parseInt(inputs.multi);
+  if (multiNum === 1)
+    sentences.push(`The rider has <span class="hi-orange">1 other delivery</span> on this trip, adding a small delay.`);
+  else if (multiNum >= 2)
+    sentences.push(`The rider has <span class="hi-orange">${multiNum} other deliveries</span> on this trip, adding meaningful delay.`);
 
   // distance
   const dist = parseFloat(inputs.distance);
@@ -1033,13 +1047,13 @@ async function predict() {
 
     const result = await response.json();
     const eta = Math.round(result.eta);
-    renderResults(eta, inputs);
+    renderResults(eta, inputs, result.low ?? null, result.high ?? null);
 
   } catch (err) {
     errBanner.style.display = 'flex';
     errBanner.querySelector('.err-msg').textContent =
       err.message.includes('Failed to fetch')
-        ? 'Cannot reach Flask server. Make sure app.py is running on port 5000.'
+        ? `Cannot reach Flask server. Make sure app.py is running (python app.py) — expected at ${FLASK_URL}.`
         : err.message;
   }
 

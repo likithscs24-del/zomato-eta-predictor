@@ -9,6 +9,7 @@ CORS(app)
 
 model = joblib.load('zomato_model.pkl')
 
+# Label-encoding maps — must match the notebook's LabelEncoder fit order (alphabetical)
 weather_map  = {'Cloudy': 0, 'Fog': 1, 'Sandstorms': 2, 'Stormy': 3, 'Sunny': 4, 'Windy': 5}
 traffic_map  = {'High': 0, 'Jam': 1, 'Low': 2, 'Medium': 3}
 vehicle_map  = {'bicycle': 0, 'electric_scooter': 1, 'motorcycle': 2, 'scooter': 3}
@@ -16,40 +17,100 @@ festival_map = {'No': 0, 'Yes': 1}
 city_map     = {'Metropolitian': 0, 'Semi-Urban': 1, 'Urban': 2}
 order_map    = {'Buffet': 0, 'Drinks': 1, 'Meal': 2, 'Snack': 3}
 
+# MAE from training — used for prediction intervals
+MODEL_MAE = 3.89
+
+
+def build_features(data):
+    """
+    Replicates the exact feature engineering used in the training notebook.
+
+    The Zomato dataset stores order/pickup timestamps as clock minutes since
+    midnight (e.g. 13:30 → 810).  The notebook derives:
+        order_mins   = hour_of_day * 60 + minute_of_day   (we assume :30 average)
+        pickup_mins  = order_mins + pickup_delay
+        pickup_delay = pickup_mins - order_mins            (typically ~10 min)
+
+    Feature order must match X columns used during model.fit().
+    """
+    hour = float(data['hour'])
+
+    # Time-of-day in minutes since midnight; assume orders placed at HH:30 on average
+    order_mins  = hour * 60 + 30.0
+    # Pickup happens ~10 min after order is placed (dataset mean ≈ 10 min)
+    pickup_delay = 10.0
+    pickup_mins  = order_mins + pickup_delay
+
+    features = np.array([[
+        float(data['age']),                    # Delivery_person_Age
+        float(data['rating']),                 # Delivery_person_Ratings
+        weather_map[data['weather']],          # Weatherconditions
+        traffic_map[data['traffic']],          # Road_traffic_density
+        float(data['vehicle_cond']),           # Vehicle_condition
+        order_map[data['order_type']],         # Type_of_order
+        vehicle_map[data['vehicle']],          # Type_of_vehicle
+        int(data['multi']),                    # multiple_deliveries
+        festival_map[data['festival']],        # Festival
+        city_map[data['city']],                # City
+        float(data['distance']),               # distance_km
+        order_mins,                            # order_mins
+        pickup_mins,                           # pickup_mins
+        pickup_delay,                          # pickup_delay
+        hour,                                  # order_hour
+    ]])
+
+    return features
+
+
 @app.route('/')
 def index():
     return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'Index.html')
+
 
 @app.route('/predict', methods=['POST'])
 def predict():
     data = request.json
 
-    hour         = float(data['hour'])
-    order_mins   = hour * 60 + 30
-    pickup_mins  = order_mins + 10
-    pickup_delay = 10.0
+    # ── Validate required fields ──────────────────────────────────────────────
+    required = ['age', 'rating', 'weather', 'traffic', 'vehicle_cond',
+                'order_type', 'vehicle', 'multi', 'festival', 'city',
+                'distance', 'hour']
+    missing = [k for k in required if k not in data]
+    if missing:
+        return jsonify({'error': f'Missing fields: {missing}'}), 400
 
-    features = np.array([[
-        float(data['age']),
-        float(data['rating']),
-        weather_map[data['weather']],
-        traffic_map[data['traffic']],
-        float(data['vehicle_cond']),
-        order_map[data['order_type']],
-        vehicle_map[data['vehicle']],
-        int(data['multi']),
-        festival_map[data['festival']],
-        city_map[data['city']],
-        float(data['distance']),
-        order_mins,
-        pickup_mins,
-        pickup_delay,
-        hour,
-    ]])
+    # ── Validate enum values ──────────────────────────────────────────────────
+    try:
+        features = build_features(data)
+    except KeyError as e:
+        return jsonify({'error': f'Invalid value for field: {e}'}), 400
 
-    prediction = model.predict(features)[0]
-    prediction = max(10, round(float(prediction)))
-    return jsonify({'eta': prediction})
+    # ── Predict ───────────────────────────────────────────────────────────────
+    raw = float(model.predict(features)[0])
+    eta = max(10, round(raw))
+
+    # ── Prediction interval using MAE as a symmetric ±bound ───────────────────
+    # For tree ensembles we also try per-tree std if available
+    low  = max(10, round(raw - MODEL_MAE))
+    high = min(54, round(raw + MODEL_MAE))
+
+    if hasattr(model, 'estimators_'):
+        # Random Forest or XGBoost with sub-estimators → use std of tree preds
+        try:
+            tree_preds = np.array([e.predict(features)[0] for e in model.estimators_])
+            std = float(np.std(tree_preds))
+            low  = max(10, round(raw - std))
+            high = min(54, round(raw + std))
+        except Exception:
+            pass  # fall back to MAE interval
+
+    return jsonify({
+        'eta':  eta,
+        'low':  low,
+        'high': high,
+        'mae':  MODEL_MAE,
+    })
+
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
