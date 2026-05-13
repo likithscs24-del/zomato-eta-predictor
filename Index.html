@@ -844,7 +844,7 @@ function renderResults(eta, inputs) {
   const mae = 3.89;
   const low = Math.max(10, Math.round(eta - mae));
   const high = Math.min(54, Math.round(eta + mae));
-  const pct = Math.min(100, Math.round((1 - mae / eta) * 100));
+  const pct = Math.max(0, Math.min(100, Math.round((1 - mae / eta) * 100)));
 
   let tier;
   if (eta <= 18) tier = 'Express';

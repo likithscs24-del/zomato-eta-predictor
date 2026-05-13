@@ -23,25 +23,30 @@ def index():
 @app.route('/predict', methods=['POST'])
 def predict():
     data = request.json
+    hour = float(data['hour'])
+    order_mins = hour * 60          # e.g. 13:00 → 780 mins since midnight
+    pickup_mins = order_mins + 10   # pickup ~10 mins after order
+    pickup_delay = 10.0             # median pickup delay
+
     features = np.array([[
-        float(data['age']),              # Delivery_person_Age
-        float(data['rating']),           # Delivery_person_Ratings
-        weather_map[data['weather']],    # Weather_conditions
-        traffic_map[data['traffic']],    # Road_traffic_density
-        float(data['vehicle_cond']),     # Vehicle_condition
-        order_map[data['order_type']],   # Type_of_order
-        vehicle_map[data['vehicle']],    # Type_of_vehicle
-        int(data['multi']),              # multiple_deliveries
-        festival_map[data['festival']],  # Festival
-        city_map[data['city']],          # City
-        float(data['distance']),         # distance_km
-        float(data['hour']),             # order_hour (just the hour, not × 60)
-        float(data['hour']) + 0.17,      # pickup time (order_hour + ~10 min in decimal)
-        10.0,                            # pickup_delay (median)
-        float(data['hour']),             # order_hour again
+        float(data['age']),
+        float(data['rating']),
+        weather_map[data['weather']],
+        traffic_map[data['traffic']],
+        float(data['vehicle_cond']),
+        order_map[data['order_type']],
+        vehicle_map[data['vehicle']],
+        int(data['multi']),
+        festival_map[data['festival']],
+        city_map[data['city']],
+        float(data['distance']),
+        order_mins,
+        pickup_mins,
+        pickup_delay,
+        hour,
     ]])
     prediction = model.predict(features)[0]
-    prediction = max(1, round(float(prediction)))  # prevent negative values
+    prediction = max(5, round(float(prediction)))  # minimum 5 mins
     return jsonify({'eta': prediction})
 
 if __name__ == '__main__':
