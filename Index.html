@@ -677,6 +677,16 @@
       </div>
 
       <div class="form-group">
+        <label>City Region</label>
+        <select id="region">
+          <option value="North">🧭 North India</option>
+          <option value="South">🌴 South India</option>
+          <option value="West">🌅 West India</option>
+          <option value="East">🌄 East India</option>
+        </select>
+      </div>
+
+      <div class="form-group">
         <label>Order Type</label>
         <select id="order_type">
           <option value="Meal">🍽️ Meal</option>
@@ -843,7 +853,7 @@ const FLASK_URL = (location.hostname === 'localhost' || location.hostname === '1
   ? 'http://localhost:5000/predict'
   : '/predict';
 
-function renderResults(eta, inputs, apiLow, apiHigh) {
+function renderResults(eta, inputs, apiLow, apiHigh, regionDelta) {
   // Use server-supplied bounds; fall back to ±MAE if missing
   const mae  = 4.21;
   const low  = (apiLow  != null) ? apiLow  : Math.max(10, Math.round(eta - mae));
@@ -898,6 +908,7 @@ function renderResults(eta, inputs, apiLow, apiHigh) {
     { name: 'Festival',      impact: 0.100, val: inputs.festival,       color: 'var(--purple2)', grad: 'linear-gradient(90deg,#7C4DFF,#B388FF)' },
     { name: 'Vehicle Cond.', impact: 0.099, val: `Level ${inputs.vehicle_cond}`, color: 'var(--orange3)', grad: 'linear-gradient(90deg,#FFAB40,#FFD180)' },
     { name: 'Distance',      impact: 0.035, val: `${inputs.distance}km`,color: 'var(--muted)',   grad: 'linear-gradient(90deg,#6B6B8A,#9090B0)' },
+    { name: 'Region',        impact: 0.020, val: regionLabel,            color: 'var(--purple2)', grad: 'linear-gradient(90deg,#7C4DFF,#B388FF)' },
   ];
   const maxImpact = factors[0].impact;
   document.getElementById('factorRows').innerHTML = factors.map(f => `
@@ -939,6 +950,8 @@ function renderResults(eta, inputs, apiLow, apiHigh) {
 
   const vehicleLabel = { motorcycle:'motorcycle', scooter:'scooter', electric_scooter:'electric scooter', bicycle:'bicycle' }[inputs.vehicle];
   const cityLabel = { Metropolitian:'metropolitan', Urban:'urban', 'Semi-Urban':'semi-urban' }[inputs.city];
+  const regionLabel = { North:'North India', South:'South India', West:'West India', East:'East India' }[inputs.region];
+  const regionEmoji = { North:'🧭', South:'🌴', West:'🌅', East:'🌄' }[inputs.region];
   const hourInt = parseInt(inputs.hour);
   const timeOfDay = hourInt < 6 ? 'late night' : hourInt < 12 ? 'morning' : hourInt < 17 ? 'afternoon' : hourInt < 21 ? 'evening' : 'night';
 
@@ -985,6 +998,11 @@ function renderResults(eta, inputs, apiLow, apiHigh) {
   else if (multiNum >= 2)
     sentences.push(`The rider has <span class="hi-orange">${multiNum} other deliveries</span> on this trip, adding meaningful delay.`);
 
+  // region adjustment
+  if (regionDelta > 1) sentences.push(`Deliveries in <span class="hi-orange">${regionLabel}</span> tend to run slightly longer due to wider city layouts and last-mile distances.`);
+  else if (regionDelta < 0) sentences.push(`<span class="hi-lime">${regionLabel}</span> cities benefit from more compact delivery zones, helping trim the ETA.`);
+  else sentences.push(`The <strong>${regionLabel}</strong> region has a neutral effect on this prediction — near the national baseline.`);
+
   // distance
   const dist = parseFloat(inputs.distance);
   if (dist > 10) sentences.push(`The distance of <strong>${dist} km</strong> is quite far and is a notable contributor to the ETA.`);
@@ -1003,6 +1021,7 @@ function renderResults(eta, inputs, apiLow, apiHigh) {
     { label: inputs.weather, bg:'rgba(0,188,212,0.1)', color:'var(--cyan)', border:'rgba(0,188,212,0.25)' },
     { label: vehicleLabel, bg:'rgba(124,77,255,0.1)', color:'var(--purple2)', border:'rgba(124,77,255,0.25)' },
     { label: cityLabel+' city', bg:'rgba(233,30,140,0.1)', color:'var(--pink2)', border:'rgba(233,30,140,0.25)' },
+    { label: regionEmoji+' '+regionLabel, bg:'rgba(124,77,255,0.1)', color:'var(--purple2)', border:'rgba(124,77,255,0.25)' },
   ];
   if (inputs.festival === 'Yes') tags.push({ label:'Festival Day 🎉', bg:'rgba(255,171,64,0.1)', color:'var(--orange3)', border:'rgba(255,171,64,0.3)' });
   document.getElementById('summaryTags').innerHTML = tags.map(t =>
@@ -1020,6 +1039,7 @@ async function predict() {
     traffic:      document.getElementById('traffic').value,
     vehicle:      document.getElementById('vehicle').value,
     city:         document.getElementById('city').value,
+    region:       document.getElementById('region').value,
     order_type:   document.getElementById('order_type').value,
     multi:        document.getElementById('multi').value,
     age:          document.getElementById('age').value,
@@ -1047,7 +1067,7 @@ async function predict() {
 
     const result = await response.json();
     const eta = Math.round(result.eta);
-    renderResults(eta, inputs, result.low ?? null, result.high ?? null);
+    renderResults(eta, inputs, result.low ?? null, result.high ?? null, result.region_delta ?? 0);
 
   } catch (err) {
     errBanner.style.display = 'flex';

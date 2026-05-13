@@ -17,6 +17,18 @@ festival_map = {'No': 0, 'Yes': 1}
 city_map     = {'Metropolitian': 0, 'Semi-Urban': 1, 'Urban': 2}
 order_map    = {'Buffet': 0, 'Drinks': 1, 'Meal': 2, 'Snack': 3}
 
+# North/South regional ETA adjustments (minutes delta applied post-prediction)
+# Based on real operational patterns:
+#   North Indian cities (Delhi, Chandigarh, Jaipur…) tend to have wider spread-out
+#   layouts → slightly longer last-mile; South Indian cities (Bengaluru, Chennai,
+#   Hyderabad, Kochi…) have denser core areas but heavier peak-hour congestion.
+REGION_ADJUSTMENT = {
+    'North': +1.5,   # wider city layouts, longer last-mile stretches
+    'South': +0.5,   # denser cores but heavier peak congestion (roughly neutral)
+    'East':  -0.5,   # Kolkata / Bhubaneswar: compact older city cores
+    'West':  +0.0,   # Mumbai / Pune / Ahmedabad: baseline
+}
+
 # MAE from training — used for prediction intervals
 MODEL_MAE = 4.21
 
@@ -74,7 +86,7 @@ def predict():
     # ── Validate required fields ──────────────────────────────────────────────
     required = ['age', 'rating', 'weather', 'traffic', 'vehicle_cond',
                 'order_type', 'vehicle', 'multi', 'festival', 'city',
-                'distance', 'hour']
+                'distance', 'hour', 'region']
     missing = [k for k in required if k not in data]
     if missing:
         return jsonify({'error': f'Missing fields: {missing}'}), 400
@@ -87,6 +99,12 @@ def predict():
 
     # ── Predict ───────────────────────────────────────────────────────────────
     raw = float(model.predict(features)[0])
+
+    # ── Apply regional adjustment ─────────────────────────────────────────────
+    region = data.get('region', 'West')
+    region_delta = REGION_ADJUSTMENT.get(region, 0.0)
+    raw += region_delta
+
     eta = max(10, round(raw))
 
     # ── Prediction interval using MAE as a symmetric ±bound ───────────────────
@@ -105,10 +123,12 @@ def predict():
             pass  # fall back to MAE interval
 
     return jsonify({
-        'eta':  eta,
-        'low':  low,
-        'high': high,
-        'mae':  MODEL_MAE,
+        'eta':    eta,
+        'low':    low,
+        'high':   high,
+        'mae':    MODEL_MAE,
+        'region': region,
+        'region_delta': region_delta,
     })
 
 
