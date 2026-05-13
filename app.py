@@ -18,7 +18,7 @@ order_map    = {'Buffet':0, 'Drinks':1, 'Meal':2, 'Snack':3}
 
 @app.route('/')
 def index():
-    return send_from_directory('.', 'zomato-eta-vibrant(1).html')
+    return send_from_directory('.', 'index.html')
 
 @app.route('/predict', methods=['POST'])
 def predict():
