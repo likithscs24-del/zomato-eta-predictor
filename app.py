@@ -24,24 +24,25 @@ def index():
 def predict():
     data = request.json
     features = np.array([[
-        float(data['age']),
-        float(data['rating']),
-        weather_map[data['weather']],
-        traffic_map[data['traffic']],
-        float(data['vehicle_cond']),
-        order_map[data['order_type']],
-        vehicle_map[data['vehicle']],
-        int(data['multi']),
-        festival_map[data['festival']],
-        city_map[data['city']],
-        float(data['distance']),
-        float(data['hour']) * 60,
-        float(data['hour']) * 60 + 10,
-        10.0,
-        float(data['hour']),
+        float(data['age']),              # Delivery_person_Age
+        float(data['rating']),           # Delivery_person_Ratings
+        weather_map[data['weather']],    # Weather_conditions
+        traffic_map[data['traffic']],    # Road_traffic_density
+        float(data['vehicle_cond']),     # Vehicle_condition
+        order_map[data['order_type']],   # Type_of_order
+        vehicle_map[data['vehicle']],    # Type_of_vehicle
+        int(data['multi']),              # multiple_deliveries
+        festival_map[data['festival']],  # Festival
+        city_map[data['city']],          # City
+        float(data['distance']),         # distance_km
+        float(data['hour']),             # order_hour (just the hour, not × 60)
+        float(data['hour']) + 0.17,      # pickup time (order_hour + ~10 min in decimal)
+        10.0,                            # pickup_delay (median)
+        float(data['hour']),             # order_hour again
     ]])
     prediction = model.predict(features)[0]
-    return jsonify({'eta': round(float(prediction))})
+    prediction = max(1, round(float(prediction)))  # prevent negative values
+    return jsonify({'eta': prediction})
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
