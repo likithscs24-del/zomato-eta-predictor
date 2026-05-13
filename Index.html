@@ -605,15 +605,15 @@
       <span class="line1">Predict Delivery</span>
       <span class="line2">Time Instantly</span>
     </h1>
-    <p>Powered by XGBoost trained on 45,584 real Zomato deliveries. Enter order details to get an accurate ETA estimate with confidence breakdown.</p>
+    <p>Powered by Random Forest trained on 45,584 real Zomato deliveries. Enter order details to get an accurate ETA estimate with confidence breakdown.</p>
 
     <div class="stat-row">
       <div class="stat-pill sp1">
-        <div class="sv">3.89</div>
+        <div class="sv">4.21</div>
         <div class="sl">MAE (min)</div>
       </div>
       <div class="stat-pill sp2">
-        <div class="sv">0.837</div>
+        <div class="sv">0.821</div>
         <div class="sl">R² Score</div>
       </div>
       <div class="stat-pill sp3">
@@ -624,7 +624,7 @@
 
     <div class="model-tag">
       <span class="mt-dot"></span>
-      XGBoost · Random Forest Ensemble
+      Random Forest · Scikit-learn
     </div>
   </div>
 
@@ -797,7 +797,7 @@
         <div id="factorRows"></div>
         <div class="info-chip">
           <span class="ic-label">Note</span>
-          <span>Feature importances from XGBoost trained on 45,584 deliveries. Predictions are served live from your Flask API.</span>
+          <span>Feature importances from Random Forest trained on 45,584 deliveries. Predictions are served live from your Flask API.</span>
         </div>
       </div>
 
@@ -845,7 +845,7 @@ const FLASK_URL = (location.hostname === 'localhost' || location.hostname === '1
 
 function renderResults(eta, inputs, apiLow, apiHigh) {
   // Use server-supplied bounds; fall back to ±MAE if missing
-  const mae  = 3.89;
+  const mae  = 4.21;
   const low  = (apiLow  != null) ? apiLow  : Math.max(10, Math.round(eta - mae));
   const high = (apiHigh != null) ? apiHigh : Math.min(54, Math.round(eta + mae));
 

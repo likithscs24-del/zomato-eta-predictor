@@ -18,7 +18,7 @@ import os
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import mean_absolute_error, r2_score
-from xgboost import XGBRegressor
+from sklearn.ensemble import RandomForestRegressor
 
 # ── 1. Load ───────────────────────────────────────────────────────────────────
 print("Loading dataset...")
@@ -122,13 +122,12 @@ X_train, X_test, y_train, y_test = train_test_split(
 )
 
 # ── 8. Train XGBoost ──────────────────────────────────────────────────────────
-print("\nTraining XGBoost model...")
-model = XGBRegressor(
+print("\nTraining Random Forest model...")
+model = RandomForestRegressor(
     n_estimators=300,
-    max_depth=6,
-    learning_rate=0.05,
-    subsample=0.8,
-    colsample_bytree=0.8,
+    max_depth=None,
+    min_samples_split=5,
+    min_samples_leaf=2,
     random_state=42,
     n_jobs=-1,
 )
@@ -145,7 +144,7 @@ print(f"  Max error: {abs(y_test.values - y_pred).max():.1f} min")
 
 # ── 10. Feature importance ────────────────────────────────────────────────────
 importances = pd.Series(model.feature_importances_, index=FEATURES).sort_values(ascending=False)
-print(f"\n── Top features ─────────────────────")
+print(f"\n── Top features (Random Forest) ─────────────────────")
 for feat, imp in importances.head(10).items():
     print(f"  {feat:<30} {imp:.4f}")
 

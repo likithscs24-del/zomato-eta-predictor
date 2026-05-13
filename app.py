@@ -18,7 +18,7 @@ city_map     = {'Metropolitian': 0, 'Semi-Urban': 1, 'Urban': 2}
 order_map    = {'Buffet': 0, 'Drinks': 1, 'Meal': 2, 'Snack': 3}
 
 # MAE from training — used for prediction intervals
-MODEL_MAE = 3.13
+MODEL_MAE = 4.21
 
 
 def build_features(data):
@@ -95,7 +95,7 @@ def predict():
     high = min(54, round(raw + MODEL_MAE))
 
     if hasattr(model, 'estimators_'):
-        # Random Forest or XGBoost with sub-estimators → use std of tree preds
+        # Random Forest → use std of individual tree predictions for tighter interval
         try:
             tree_preds = np.array([e.predict(features)[0] for e in model.estimators_])
             std = float(np.std(tree_preds))

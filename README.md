@@ -1,6 +1,6 @@
 # Zomato Delivery ETA Predictor
 
-A machine learning web app that predicts food delivery time.
+A machine learning web app that predicts food delivery time using a Random Forest model.
 
 ## Run Locally
 pip install -r requirements.txt
