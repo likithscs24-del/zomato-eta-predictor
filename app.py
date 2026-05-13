@@ -19,7 +19,8 @@ order_map    = {'Buffet': 0, 'Drinks': 1, 'Meal': 2, 'Snack': 3}
  
 @app.route('/')
 def index():
-    return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'index.html')
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    return send_from_directory(base_dir, 'Index.html')
  
 @app.route('/predict', methods=['POST'])
 def predict():
