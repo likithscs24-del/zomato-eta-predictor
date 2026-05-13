@@ -3,11 +3,11 @@ from flask_cors import CORS
 import joblib
 import numpy as np
 import os
-
 app = Flask(__name__)
 CORS(app)
 
-model = joblib.load('zomato_model.pkl')
+MODEL_PATH = 'zomato_model.pkl'
+model = joblib.load(MODEL_PATH)
 
 # Label-encoding maps — must match the notebook's LabelEncoder fit order (alphabetical)
 weather_map  = {'Cloudy': 0, 'Fog': 1, 'Sandstorms': 2, 'Stormy': 3, 'Sunny': 4, 'Windy': 5}
@@ -18,7 +18,7 @@ city_map     = {'Metropolitian': 0, 'Semi-Urban': 1, 'Urban': 2}
 order_map    = {'Buffet': 0, 'Drinks': 1, 'Meal': 2, 'Snack': 3}
 
 # MAE from training — used for prediction intervals
-MODEL_MAE = 3.89
+MODEL_MAE = 3.13
 
 
 def build_features(data):
