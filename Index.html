@@ -444,7 +444,7 @@
   .eta-step { flex: 1; text-align: center; position: relative; }
   .eta-step:not(:last-child)::after {
     content: '▶';
-    position: absolute; right: -10px; top: 50%; transform: translateY(-50%);
+    position: absolute right: -10px; top: 50%; transform: translateY(-50%);
     color: var(--muted); font-size: 0.6rem;
   }
   .eta-dot {
@@ -832,18 +832,21 @@
 </div>
 
 <script>
-// UPDATED URL TO POINT TO YOUR DEPLOYED RENDER API
-const FLASK_URL = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-  ? 'http://localhost:5000/predict'
-  : 'https://zomato-eta-predictor.onrender.com/predict';
+// Point to your deployed Render API
+const FLASK_URL = 'https://zomato-eta-predictor.onrender.com/predict';
 
 function renderResults(eta, inputs, apiLow, apiHigh, regionDelta) {
-  const mae  = 4.21;
-  const low  = (apiLow  != null) ? apiLow  : Math.max(10, Math.round(eta - mae));
-  const high = (apiHigh != null) ? apiHigh : Math.min(54, Math.round(eta + mae));
+  const mae = 4.21;
+  // LOGIC FIX: Ensure low is always smaller than high and both are reasonable
+  let low  = (apiLow  != null) ? apiLow  : Math.max(5, Math.round(eta - mae));
+  let high = (apiHigh != null) ? apiHigh : Math.max(low + 2, Math.round(eta + mae));
+  
+  if (low > high) {
+    [low, high] = [high, low];
+  }
 
-  const fullRange   = 54 - 10;
-  const predRange   = Math.max(1, high - low);
+  const fullRange = 54 - 10;
+  const predRange = Math.max(1, high - low);
   const pct = Math.max(30, Math.min(98, Math.round((1 - predRange / fullRange) * 100 + 50)));
 
   let tier;
@@ -882,14 +885,14 @@ function renderResults(eta, inputs, apiLow, apiHigh, regionDelta) {
   const regionLabel = { North:'North India', South:'South India', West:'West India', East:'East India' }[inputs.region];
 
   const factors = [
-    { name: 'Traffic',       impact: 0.212, val: inputs.traffic,        color: 'var(--orange)',  grad: 'linear-gradient(90deg,#FF5722,#FF8A50)' },
-    { name: 'Multi-Delivery',impact: 0.178, val: `×${inputs.multi}`,    color: 'var(--pink)',    grad: 'linear-gradient(90deg,#E91E8C,#F06292)' },
-    { name: 'Rider Rating',  impact: 0.148, val: `${inputs.rating}★`,   color: 'var(--lime)',    grad: 'linear-gradient(90deg,#C6FF00,#DEFF47)' },
-    { name: 'Weather',       impact: 0.101, val: inputs.weather,        color: 'var(--cyan)',    grad: 'linear-gradient(90deg,#00BCD4,#4DD0E1)' },
-    { name: 'Festival',      impact: 0.100, val: inputs.festival,       color: 'var(--purple2)', grad: 'linear-gradient(90deg,#7C4DFF,#B388FF)' },
+    { name: 'Traffic', impact: 0.212, val: inputs.traffic, color: 'var(--orange)', grad: 'linear-gradient(90deg,#FF5722,#FF8A50)' },
+    { name: 'Multi-Delivery', impact: 0.178, val: `×${inputs.multi}`, color: 'var(--pink)', grad: 'linear-gradient(90deg,#E91E8C,#F06292)' },
+    { name: 'Rider Rating', impact: 0.148, val: `${inputs.rating}★`, color: 'var(--lime)', grad: 'linear-gradient(90deg,#C6FF00,#DEFF47)' },
+    { name: 'Weather', impact: 0.101, val: inputs.weather, color: 'var(--cyan)', grad: 'linear-gradient(90deg,#00BCD4,#4DD0E1)' },
+    { name: 'Festival', impact: 0.100, val: inputs.festival, color: 'var(--purple2)', grad: 'linear-gradient(90deg,#7C4DFF,#B388FF)' },
     { name: 'Vehicle Cond.', impact: 0.099, val: `Level ${inputs.vehicle_cond}`, color: 'var(--orange3)', grad: 'linear-gradient(90deg,#FFAB40,#FFD180)' },
-    { name: 'Distance',      impact: 0.035, val: `${inputs.distance}km`,color: 'var(--muted)',   grad: 'linear-gradient(90deg,#6B6B8A,#9090B0)' },
-    { name: 'Region',        impact: 0.020, val: regionLabel,            color: 'var(--purple2)', grad: 'linear-gradient(90deg,#7C4DFF,#B388FF)' },
+    { name: 'Distance', impact: 0.035, val: `${inputs.distance}km`, color: 'var(--muted)', grad: 'linear-gradient(90deg,#6B6B8A,#9090B0)' },
+    { name: 'Region', impact: 0.020, val: regionLabel, color: 'var(--purple2)', grad: 'linear-gradient(90deg,#7C4DFF,#B388FF)' },
   ];
   const maxImpact = factors[0].impact;
   document.getElementById('factorRows').innerHTML = factors.map(f => `
@@ -923,11 +926,6 @@ function renderResults(eta, inputs, apiLow, apiHigh, regionDelta) {
     </div>
   `;
 
-  const now2 = new Date();
-  const tLow2 = new Date(now2.getTime() + low * 60000);
-  const tHigh2 = new Date(now2.getTime() + high * 60000);
-  const fmt2 = d => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
   const vehicleLabel = { motorcycle:'motorcycle', scooter:'scooter', electric_scooter:'electric scooter', bicycle:'bicycle' }[inputs.vehicle];
   const cityLabel = { Metropolitian:'metropolitan', Urban:'urban', 'Semi-Urban':'semi-urban' }[inputs.city];
   const regionEmoji = { North:'🧭', South:'🌴', West:'🌅', East:'🌄' }[inputs.region];
@@ -937,17 +935,17 @@ function renderResults(eta, inputs, apiLow, apiHigh, regionDelta) {
   let sentences = [];
   const tierPhrases = {
     Express: `This is an <span class="hi-lime">express delivery</span> — among the fastest possible.`,
-    Fast:    `This is a <span class="hi-cyan">fast delivery</span> — well above average speed.`,
+    Fast: `This is a <span class="hi-cyan">fast delivery</span> — well above average speed.`,
     Standard:`This is a <span class="hi-orange">standard delivery</span> — typical for these conditions.`,
-    Slow:    `This is a <span class="hi-pink">slow delivery</span> — conditions are working against you.`,
+    Slow: `This is a <span class="hi-pink">slow delivery</span> — conditions are working against you.`,
   };
-  sentences.push(`Your order is predicted to arrive in <strong>${eta} minutes</strong> (between <span class="hi-cyan">${fmt2(tLow2)}</span> and <span class="hi-cyan">${fmt2(tHigh2)}</span>). ${tierPhrases[tier]}`);
+  sentences.push(`Your order is predicted to arrive in <strong>${eta} minutes</strong> (between <span class="hi-cyan">${fmt(tLow)}</span> and <span class="hi-cyan">${fmt(tHigh)}</span>). ${tierPhrases[tier]}`);
 
   const trafficSentences = {
-    Jam:    `<span class="hi-pink">Traffic is jammed</span> — the single biggest delay factor, adding roughly 10 minutes to the base time.`,
-    High:   `<span class="hi-orange">High traffic</span> is adding noticeable delay to the route.`,
+    Jam: `<span class="hi-pink">Traffic is jammed</span> — the single biggest delay factor, adding roughly 10 minutes to the base time.`,
+    High: `<span class="hi-orange">High traffic</span> is adding noticeable delay to the route.`,
     Medium: `Traffic is <strong>moderate</strong>, contributing a mild delay.`,
-    Low:    `<span class="hi-lime">Traffic is light</span>, helping keep the ETA down.`,
+    Low: `<span class="hi-lime">Traffic is light</span>, helping keep the ETA down.`,
   };
   sentences.push(trafficSentences[inputs.traffic]);
 
@@ -969,16 +967,16 @@ function renderResults(eta, inputs, apiLow, apiHigh, regionDelta) {
   else if (multiNum >= 2)
     sentences.push(`The rider has <span class="hi-orange">${multiNum} other deliveries</span> on this trip, adding meaningful delay.`);
 
-  if (regionDelta > 1) sentences.push(`Deliveries in <span class="hi-orange">${regionLabel}</span> tend to run slightly longer due to wider city layouts and last-mile distances.`);
-  else if (regionDelta < 0) sentences.push(`<span class="hi-lime">${regionLabel}</span> cities benefit from more compact delivery zones, helping trim the ETA.`);
-  else sentences.push(`The <strong>${regionLabel}</strong> region has a neutral effect on this prediction — near the national baseline.`);
+  if (regionDelta > 1) sentences.push(`Deliveries in <span class="hi-orange">${regionLabel}</span> tend to run slightly longer due to wider city layouts.`);
+  else if (regionDelta < 0) sentences.push(`<span class="hi-lime">${regionLabel}</span> cities benefit from more compact delivery zones.`);
+  else sentences.push(`The <strong>${regionLabel}</strong> region has a neutral effect on this prediction.`);
 
   const dist = parseFloat(inputs.distance);
   if (dist > 10) sentences.push(`The distance of <strong>${dist} km</strong> is quite far and is a notable contributor to the ETA.`);
   else if (dist <= 3) sentences.push(`At just <strong>${dist} km</strong>, the delivery distance is short — a positive factor.`);
 
   if (['evening','afternoon'].includes(timeOfDay) && (hourInt >= 12 && hourInt <= 14 || hourInt >= 18 && hourInt <= 21))
-    sentences.push(`Ordering during the <span class="hi-orange">${timeOfDay} rush</span> adds a small delay due to higher order volumes.`);
+    sentences.push(`Ordering during the <span class="hi-orange">${timeOfDay} rush</span> adds a small delay.`);
 
   document.getElementById('summaryText').innerHTML = sentences.join(' ');
 
@@ -1002,19 +1000,19 @@ function renderResults(eta, inputs, apiLow, apiHigh, regionDelta) {
 
 async function predict() {
   const inputs = {
-    weather:      document.getElementById('weather').value,
-    traffic:      document.getElementById('traffic').value,
-    vehicle:      document.getElementById('vehicle').value,
-    city:         document.getElementById('city').value,
-    region:       document.getElementById('region').value,
-    order_type:   document.getElementById('order_type').value,
-    multi:        document.getElementById('multi').value,
-    age:          document.getElementById('age').value,
-    rating:       document.getElementById('rating').value,
-    distance:     document.getElementById('distance').value,
-    hour:         document.getElementById('hour').value,
+    weather: document.getElementById('weather').value,
+    traffic: document.getElementById('traffic').value,
+    vehicle: document.getElementById('vehicle').value,
+    city: document.getElementById('city').value,
+    region: document.getElementById('region').value,
+    order_type: document.getElementById('order_type').value,
+    multi: document.getElementById('multi').value,
+    age: document.getElementById('age').value,
+    rating: document.getElementById('rating').value,
+    distance: document.getElementById('distance').value,
+    hour: document.getElementById('hour').value,
     vehicle_cond: document.getElementById('vehicle_cond').value,
-    festival:     document.getElementById('festival').value,
+    festival: document.getElementById('festival').value,
   };
 
   const btn = document.getElementById('predictBtn');
@@ -1040,7 +1038,7 @@ async function predict() {
     errBanner.style.display = 'flex';
     errBanner.querySelector('.err-msg').textContent =
       err.message.includes('Failed to fetch')
-        ? `Cannot reach Flask server. Make sure your Render service is active — expected at ${FLASK_URL}. Note: Render free tier services go to "sleep" after inactivity and may take 50 seconds to wake up.`
+        ? `Cannot reach Flask server. Render services may take ~50s to wake up.`
         : err.message;
   }
 
