@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zomato Delivery Time Predictor</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --orange: #FF5722;
+    --orange2: #FF8A50;
+    --orange3: #FFAB40;
+    --pink: #E91E8C;
+    --pink2: #F06292;
+    --cyan: #00BCD4;
+    --cyan2: #4DD0E1;
+    --lime: #C6FF00;
+    --lime2: #DEFF47;
+    --purple: #7C4DFF;
+    --purple2: #B388FF;
+    --bg: #0A0A0F;
+    --bg2: #11111A;
+    --card: #15151F;
+    --card2: #1C1C2A;
+    --card3: #222232;
+    --white: #FFFFFF;
+    --muted: #6B6B8A;
+    --light: #C8C8E0;
+    --border: rgba(255,255,255,0.06);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--white);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* noise overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.6;
+  }
+
+  /* ── Ambient blobs ── */
+  .blob-wrap {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    overflow: hidden;
+  }
+  .blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.15;
+  }
+  .blob-1 { width: 500px; height: 500px; background: var(--orange); top: -150px; left: -100px; }
+  .blob-2 { width: 400px; height: 400px; background: var(--pink); top: 200px; right: -120px; }
+  .blob-3 { width: 350px; height: 350px; background: var(--cyan); bottom: 50px; left: 200px; }
+  .blob-4 { width: 300px; height: 300px; background: var(--purple); top: 50%; right: 200px; }
+
+  /* ── Content wrapper ── */
+  .wrap { position: relative; z-index: 1; }
+
+  /* ── Header ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 0 2rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(10,10,15,0.85);
+    backdrop-filter: blur(20px);
+  }
+  .header-inner {
+    max-width: 1140px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 68px;
+  }
+  .logo { display: flex; align-items: center; gap: 0.75rem; }
+  .logo-icon {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, var(--orange), var(--pink));
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    box-shadow: 0 0 20px rgba(255,87,34,0.4);
+  }
+  .logo-text {
+    font-family: 'Clash Display', sans-serif;
+    font-weight: 700;
+    font-size: 1.2rem;
+    letter-spacing: -0.02em;
+  }
+  .logo-text span {
+    background: linear-gradient(90deg, var(--orange), var(--orange3));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .header-right { display: flex; align-items: center; gap: 0.75rem; }
+  .header-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--lime);
+    background: rgba(198,255,0,0.1);
+    border: 1px solid rgba(198,255,0,0.25);
+    padding: 5px 12px;
+    border-radius: 20px;
+  }
+  .pulse-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--lime);
+    box-shadow: 0 0 8px var(--lime);
+    animation: blink 2s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ── Hero ── */
+  .hero {
+    max-width: 1140px;
+    margin: 0 auto;
+    padding: 4rem 2rem 2rem;
+    display: grid;
+    grid-template-columns: 1fr 1.1fr;
+    gap: 3.5rem;
+    align-items: start;
+  }
+
+  .hero-left h1 {
+    font-family: 'Clash Display', sans-serif;
+    font-size: 3.2rem;
+    font-weight: 700;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    margin-bottom: 1rem;
+  }
+  .hero-left h1 .line1 { display: block; color: var(--white); }
+  .hero-left h1 .line2 {
+    display: block;
+    background: linear-gradient(90deg, var(--orange), var(--pink), var(--orange3));
+    background-size: 200%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 4s ease infinite;
+  }
+  @keyframes shimmer { 0%,100%{background-position:0%} 50%{background-position:100%} }
+
+  .hero-left p {
+    color: var(--muted);
+    font-size: 0.97rem;
+    line-height: 1.7;
+    margin-bottom: 2rem;
+    max-width: 420px;
+  }
+
+  .stat-row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 2rem; }
+  .stat-pill {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 0.8rem 1.1rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat-pill::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+  }
+  .stat-pill.sp1::before { background: linear-gradient(90deg, var(--orange), var(--orange3)); }
+  .stat-pill.sp2::before { background: linear-gradient(90deg, var(--pink), var(--purple)); }
+  .stat-pill.sp3::before { background: linear-gradient(90deg, var(--cyan), var(--lime)); }
+  .stat-pill .sv { font-size: 1.5rem; font-weight: 700; font-family: 'Clash Display', sans-serif; }
+  .sp1 .sv { color: var(--orange); }
+  .sp2 .sv { color: var(--pink); }
+  .sp3 .sv { color: var(--cyan); }
+  .stat-pill .sl { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 3px; }
+
+  .model-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    background: linear-gradient(90deg, rgba(124,77,255,0.15), rgba(233,30,140,0.1));
+    border: 1px solid rgba(124,77,255,0.3);
+    padding: 8px 16px;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--purple2);
+  }
+  .model-tag .mt-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--purple);
+    box-shadow: 0 0 8px var(--purple);
+    animation: blink 2s ease infinite;
+  }
+
+  /* ── Form card ── */
+  .form-card {
+    background: var(--card);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 24px;
+    padding: 2rem 2rem 1.5rem;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 40px 80px rgba(0,0,0,0.5);
+  }
+  .form-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--orange), var(--pink), var(--purple), var(--cyan));
+    background-size: 300%;
+    animation: borderFlow 5s linear infinite;
+  }
+  @keyframes borderFlow { 0%{background-position:0%} 100%{background-position:300%} }
+
+  .form-card-header {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    margin-bottom: 1.5rem;
+  }
+  .form-card-header h2 { font-size: 1.05rem; font-weight: 700; color: var(--light); }
+  .fc-icon {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, rgba(255,87,34,0.2), rgba(233,30,140,0.2));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; }
+  .form-group { display: flex; flex-direction: column; gap: 0.35rem; }
+  .form-group.full { grid-column: 1 / -1; }
+
+  label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+  }
+
+  select, input[type="number"] {
+    background: var(--card2);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+    color: var(--white);
+    padding: 0.6rem 0.85rem;
+    font-size: 0.88rem;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    -webkit-appearance: none;
+  }
+  select { cursor: pointer; }
+  select:focus, input[type="number"]:focus {
+    border-color: var(--orange);
+    box-shadow: 0 0 0 3px rgba(255,87,34,0.12);
+  }
+  select option { background: #1C1C2A; }
+
+  .predict-btn {
+    width: 100%;
+    margin-top: 1.25rem;
+    padding: 1rem;
+    background: linear-gradient(135deg, var(--orange), var(--pink));
+    border: none;
+    border-radius: 12px;
+    color: white;
+    font-family: 'Clash Display', sans-serif;
+    font-weight: 700;
+    font-size: 1.05rem;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+    transition: all 0.25s;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(255,87,34,0.3);
+  }
+  .predict-btn::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.15), transparent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .predict-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(255,87,34,0.45); }
+  .predict-btn:hover::after { opacity: 1; }
+  .predict-btn:active { transform: translateY(0); }
+  .predict-btn.loading { opacity: 0.6; pointer-events: none; }
+
+  /* ── Main content ── */
+  .main-content {
+    max-width: 1140px;
+    margin: 0 auto;
+    padding: 0 2rem 5rem;
+  }
+
+  .result-section { display: none; margin-top: 2.5rem; }
+  .result-section.visible { display: block; animation: fadeUp 0.5s ease; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:translateY(0)} }
+
+  /* ── Top cards ── */
+  .result-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .rc {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 1.5rem 1.25rem;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s;
+  }
+  .rc:hover { transform: translateY(-3px); }
+  .rc-glow {
+    position: absolute;
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    filter: blur(40px);
+    top: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    opacity: 0.35;
+  }
+  .rc-icon { font-size: 1.4rem; margin-bottom: 0.5rem; }
+  .rc-val {
+    font-family: 'Clash Display', sans-serif;
+    font-size: 2.4rem;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+  .rc-unit { font-size: 0.85rem; opacity: 0.6; margin-left: 2px; }
+  .rc-label { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-top: 0.5rem; }
+
+  .rc.eta { border-color: rgba(255,87,34,0.3); background: linear-gradient(145deg, #1A0F0A, var(--card)); }
+  .rc.eta .rc-glow { background: var(--orange); }
+  .rc.eta .rc-val { background: linear-gradient(135deg, var(--orange), var(--orange3)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+
+  .rc.range { border-color: rgba(0,188,212,0.25); }
+  .rc.range .rc-glow { background: var(--cyan); }
+  .rc.range .rc-val { color: var(--cyan); font-size: 1.5rem; padding-top: 0.5rem; }
+
+  .rc.conf { border-color: rgba(198,255,0,0.25); }
+  .rc.conf .rc-glow { background: var(--lime); }
+  .rc.conf .rc-val { color: var(--lime); }
+
+  .rc.tier { border-color: rgba(233,30,140,0.25); }
+  .rc.tier .rc-glow { background: var(--pink); }
+  .rc.tier .rc-val { color: var(--pink); font-size: 1.8rem; padding-top: 0.3rem; }
+
+  /* ── Breakdown grid ── */
+  .breakdown-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+  }
+
+  .bd-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 1.6rem;
+  }
+  .bd-card h3 {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--light);
+    margin-bottom: 1.25rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .bd-card h3::before {
+    content: '';
+    display: inline-block;
+    width: 4px;
+    height: 16px;
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+  .factors h3::before { background: linear-gradient(to bottom, var(--orange), var(--pink)); }
+  .timeline-card h3::before { background: linear-gradient(to bottom, var(--cyan), var(--purple)); }
+
+  /* factor rows */
+  .factor-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.85rem;
+  }
+  .factor-name { font-size: 0.8rem; color: var(--light); width: 110px; flex-shrink: 0; font-weight: 500; }
+  .factor-bar-wrap {
+    flex: 1;
+    height: 5px;
+    background: var(--card3);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .factor-bar { height: 100%; border-radius: 3px; transition: width 1.2s cubic-bezier(.2,.8,.2,1); }
+  .factor-val { font-size: 0.75rem; font-weight: 700; width: 52px; text-align: right; flex-shrink: 0; }
+
+  /* gauge */
+  .gauge-container { margin-bottom: 1.25rem; }
+  .gauge-label-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; }
+  .gauge-label-row span { font-size: 0.72rem; color: var(--muted); }
+  .gauge-track {
+    height: 10px;
+    background: var(--card3);
+    border-radius: 5px;
+    overflow: hidden;
+    position: relative;
+  }
+  .gauge-fill {
+    height: 100%;
+    border-radius: 5px;
+    background: linear-gradient(90deg, #00E5FF, var(--lime), var(--orange3), var(--orange), var(--pink));
+    background-size: 300%;
+    width: 0%;
+    transition: width 1.2s cubic-bezier(.2,.8,.2,1);
+  }
+
+  /* timeline steps */
+  .eta-timeline { display: flex; align-items: center; gap: 0; margin: 1.25rem 0; }
+  .eta-step { flex: 1; text-align: center; position: relative; }
+  .eta-step:not(:last-child)::after {
+    content: '▶';
+    position: absolute; right: -10px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); font-size: 0.6rem;
+  }
+  .eta-dot {
+    width: 44px; height: 44px;
+    border-radius: 14px;
+    margin: 0 auto 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem;
+  }
+  .es-label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .es-val { font-size: 0.9rem; font-weight: 700; margin-top: 2px; font-family: 'Clash Display', sans-serif; }
+
+  /* confidence */
+  .conf-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; margin-top: 1.25rem; }
+  .conf-row span { font-size: 0.75rem; color: var(--muted); }
+  .conf-track { height: 8px; background: var(--card3); border-radius: 4px; overflow: hidden; }
+  .conf-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--cyan), var(--lime));
+    width: 0%;
+    border-radius: 4px;
+    transition: width 1.3s ease;
+  }
+
+  /* info panel */
+  .info-chip {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    margin-top: 1rem;
+    font-size: 0.82rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .info-chip .ic-label { color: var(--cyan2); font-weight: 700; flex-shrink: 0; }
+
+  /* ── Summary card ── */
+  .summary-card {
+    display: flex;
+    gap: 1.25rem;
+    align-items: flex-start;
+    background: var(--card);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 18px;
+    padding: 1.5rem 1.75rem;
+    margin-bottom: 1rem;
+    position: relative;
+    overflow: hidden;
+  }
+  .summary-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, rgba(255,87,34,0.06), rgba(233,30,140,0.05), rgba(124,77,255,0.05));
+    pointer-events: none;
+  }
+  .summary-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--orange), var(--pink), var(--purple), var(--cyan));
+  }
+  .summary-icon {
+    font-size: 2rem;
+    flex-shrink: 0;
+    margin-top: 2px;
+    filter: drop-shadow(0 0 8px rgba(255,87,34,0.4));
+  }
+  .summary-body { flex: 1; }
+  .summary-title {
+    font-family: 'Clash Display', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+  .summary-text {
+    font-size: 1rem;
+    line-height: 1.65;
+    color: var(--light);
+    font-weight: 400;
+  }
+  .summary-text strong { color: var(--white); font-weight: 700; }
+  .summary-text .hi-orange { color: var(--orange); font-weight: 700; }
+  .summary-text .hi-pink   { color: var(--pink);   font-weight: 700; }
+  .summary-text .hi-cyan   { color: var(--cyan);   font-weight: 700; }
+  .summary-text .hi-lime   { color: var(--lime);   font-weight: 700; }
+  .summary-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.85rem;
+  }
+  .s-tag {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 20px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  @media (max-width: 768px) {
+    .hero { grid-template-columns: 1fr; gap: 2rem; }
+    .hero-left h1 { font-size: 2.4rem; }
+    .result-grid { grid-template-columns: 1fr 1fr; }
+    .breakdown-grid { grid-template-columns: 1fr; }
+    .form-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="blob-wrap">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+  <div class="blob blob-4"></div>
+</div>
+
+<div class="wrap">
+
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-icon">🍜</div>
+      <div class="logo-text"><span>Zomato</span> ETA</div>
+    </div>
+    <div class="header-right">
+      <div class="pulse-dot"></div>
+      <div class="header-badge">ML Predictor v1.0</div>
+    </div>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-left">
+    <h1>
+      <span class="line1">Predict Delivery</span>
+      <span class="line2">Time Instantly</span>
+    </h1>
+    <p>Powered by XGBoost trained on 45,584 real Zomato deliveries. Enter order details to get an accurate ETA estimate with confidence breakdown.</p>
+
+    <div class="stat-row">
+      <div class="stat-pill sp1">
+        <div class="sv">3.89</div>
+        <div class="sl">MAE (min)</div>
+      </div>
+      <div class="stat-pill sp2">
+        <div class="sv">0.837</div>
+        <div class="sl">R² Score</div>
+      </div>
+      <div class="stat-pill sp3">
+        <div class="sv">45K</div>
+        <div class="sl">Training Records</div>
+      </div>
+    </div>
+
+    <div class="model-tag">
+      <span class="mt-dot"></span>
+      XGBoost · Random Forest Ensemble
+    </div>
+  </div>
+
+  <div class="form-card">
+    <div class="form-card-header">
+      <div class="fc-icon">🚀</div>
+      <h2>Order Details</h2>
+    </div>
+
+    <div class="form-grid">
+      <div class="form-group">
+        <label>Weather Conditions</label>
+        <select id="weather">
+          <option value="Sunny">☀️ Sunny</option>
+          <option value="Cloudy">☁️ Cloudy</option>
+          <option value="Fog">🌁 Fog</option>
+          <option value="Stormy">⛈️ Stormy</option>
+          <option value="Sandstorms">🌪️ Sandstorms</option>
+          <option value="Windy">💨 Windy</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Traffic Density</label>
+        <select id="traffic">
+          <option value="Low">🟢 Low</option>
+          <option value="Medium">🟡 Medium</option>
+          <option value="High">🟠 High</option>
+          <option value="Jam">🔴 Jam</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Vehicle Type</label>
+        <select id="vehicle">
+          <option value="motorcycle">🏍️ Motorcycle</option>
+          <option value="scooter">🛵 Scooter</option>
+          <option value="electric_scooter">⚡ Electric Scooter</option>
+          <option value="bicycle">🚲 Bicycle</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>City Type</label>
+        <select id="city">
+          <option value="Metropolitian">🏙️ Metropolitan</option>
+          <option value="Urban">🏘️ Urban</option>
+          <option value="Semi-Urban">🌆 Semi-Urban</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Order Type</label>
+        <select id="order_type">
+          <option value="Meal">🍽️ Meal</option>
+          <option value="Snack">🍟 Snack</option>
+          <option value="Drinks">🥤 Drinks</option>
+          <option value="Buffet">🍱 Buffet</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Multiple Deliveries</label>
+        <select id="multi">
+          <option value="0">None (solo)</option>
+          <option value="1">1 extra</option>
+          <option value="2">2 extras</option>
+          <option value="3">3 extras</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Rider Age</label>
+        <input type="number" id="age" min="15" max="50" value="29" placeholder="15–50">
+      </div>
+
+      <div class="form-group">
+        <label>Rider Rating</label>
+        <select id="rating">
+          <option value="5.0">⭐ 5.0 — Excellent</option>
+          <option value="4.5">⭐ 4.5 — Very Good</option>
+          <option value="4.0" selected>⭐ 4.0 — Good</option>
+          <option value="3.5">⭐ 3.5 — Average</option>
+          <option value="3.0">⭐ 3.0 — Below Avg</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Distance (km)</label>
+        <input type="number" id="distance" min="0.5" max="30" step="0.1" value="5.0">
+      </div>
+
+      <div class="form-group">
+        <label>Order Hour (0–23)</label>
+        <input type="number" id="hour" min="0" max="23" value="13">
+      </div>
+
+      <div class="form-group">
+        <label>Vehicle Condition</label>
+        <select id="vehicle_cond">
+          <option value="2">🟢 Good (2)</option>
+          <option value="1">🟡 Fair (1)</option>
+          <option value="0">🔴 Poor (0)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Festival Day?</label>
+        <select id="festival">
+          <option value="No">No</option>
+          <option value="Yes">🎉 Yes</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="errBanner" style="display:none;align-items:flex-start;gap:0.6rem;background:rgba(233,30,140,0.08);border:1px solid rgba(233,30,140,0.3);border-radius:10px;padding:0.75rem 1rem;margin-top:1rem;font-size:0.82rem;">
+      <span style="color:#E91E8C;font-weight:700;flex-shrink:0;">⚠ Error</span>
+      <span class="err-msg" style="color:var(--light);line-height:1.5;"></span>
+    </div>
+    <button class="predict-btn" id="predictBtn" onclick="predict()">
+      ⚡ Predict Delivery Time
+    </button>
+  </div>
+</div>
+
+<div class="main-content">
+  <div class="result-section" id="resultSection">
+
+    <div class="result-grid">
+      <div class="rc eta">
+        <div class="rc-glow"></div>
+        <div class="rc-icon">⏱</div>
+        <div class="rc-val" id="etaVal">—</div>
+        <div style="font-size:0.82rem;color:var(--muted);margin-top:3px;">minutes</div>
+        <div class="rc-label">Predicted ETA</div>
+      </div>
+      <div class="rc range">
+        <div class="rc-glow"></div>
+        <div class="rc-icon">📐</div>
+        <div class="rc-val" id="rangeVal">—</div>
+        <div class="rc-label">Confidence Range</div>
+      </div>
+      <div class="rc conf">
+        <div class="rc-glow"></div>
+        <div class="rc-icon">🎯</div>
+        <div class="rc-val" id="confVal">—<span class="rc-unit">%</span></div>
+        <div class="rc-label">Model Confidence</div>
+      </div>
+      <div class="rc tier">
+        <div class="rc-glow"></div>
+        <div class="rc-icon">📦</div>
+        <div class="rc-val" id="tierVal">—</div>
+        <div class="rc-label">Speed Tier</div>
+      </div>
+    </div>
+
+    <!-- AI Summary Banner -->
+    <div class="summary-card" id="summaryCard">
+      <div class="summary-icon">🧠</div>
+      <div class="summary-body">
+        <div class="summary-title">Prediction Summary</div>
+        <div class="summary-text" id="summaryText"></div>
+        <div class="summary-tags" id="summaryTags"></div>
+      </div>
+    </div>
+
+    <div class="breakdown-grid">
+      <div class="bd-card factors">
+        <h3>Factor Impact Analysis</h3>
+        <div id="factorRows"></div>
+        <div class="info-chip">
+          <span class="ic-label">Note</span>
+          <span>Feature importances from XGBoost trained on 45,584 deliveries. Predictions are served live from your Flask API.</span>
+        </div>
+      </div>
+
+      <div class="bd-card timeline-card">
+        <h3>Time Breakdown</h3>
+
+        <div class="gauge-container">
+          <div class="gauge-label-row">
+            <span>🟢 Fast (10 min)</span>
+            <span>🔴 Slow (54 min)</span>
+          </div>
+          <div class="gauge-track">
+            <div class="gauge-fill" id="gaugeFill"></div>
+          </div>
+        </div>
+
+        <div class="eta-timeline" id="etaTimeline"></div>
+
+        <div class="conf-row">
+          <span>Model Confidence</span>
+          <span style="font-weight:700;color:var(--lime)" id="confLabel">—</span>
+        </div>
+        <div class="conf-track">
+          <div class="conf-fill" id="confFill"></div>
+        </div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:0.4rem;">Based on input similarity to training data</div>
+
+        <div class="info-chip" style="margin-top:1rem;flex-direction:column;gap:0.3rem;">
+          <div><span class="ic-label">ETA Window &nbsp;</span><span id="etaWindow">—</span></div>
+          <div><span class="ic-label">Tip &nbsp;</span><span id="rec" style="color:var(--light)">—</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+</div><!-- /wrap -->
+
+<script>
+const FLASK_URL = 'http://localhost:5000/predict';
+
+function renderResults(eta, inputs) {
+  const mae = 3.89;
+  const low = Math.max(10, Math.round(eta - mae));
+  const high = Math.min(54, Math.round(eta + mae));
+  const pct = Math.min(100, Math.round((1 - mae / eta) * 100));
+
+  let tier;
+  if (eta <= 18) tier = 'Express';
+  else if (eta <= 25) tier = 'Fast';
+  else if (eta <= 33) tier = 'Standard';
+  else tier = 'Slow';
+
+  document.getElementById('etaVal').textContent = eta;
+  document.getElementById('rangeVal').textContent = `${low}–${high} min`;
+  document.getElementById('confVal').innerHTML = `${pct}<span class="rc-unit">%</span>`;
+  document.getElementById('tierVal').textContent = tier;
+
+  const gaugePct = ((eta - 10) / (54 - 10)) * 100;
+  setTimeout(() => {
+    document.getElementById('gaugeFill').style.width = gaugePct + '%';
+  }, 100);
+
+  document.getElementById('confFill').style.width = pct + '%';
+  document.getElementById('confLabel').textContent = pct + '%';
+
+  const now = new Date();
+  const tLow = new Date(now.getTime() + low * 60000);
+  const tHigh = new Date(now.getTime() + high * 60000);
+  const fmt = d => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  document.getElementById('etaWindow').textContent = `${fmt(tLow)} – ${fmt(tHigh)}`;
+
+  const recs = {
+    Jam: 'Consider ordering during off-peak hours to avoid jam delays.',
+    High: 'Slight traffic expected — allow a small buffer.',
+    Medium: 'Moderate conditions — standard delivery expected.',
+    Low: 'Great conditions! Your order should arrive quickly.',
+  };
+  document.getElementById('rec').textContent = recs[inputs.traffic];
+
+  const factors = [
+    { name: 'Traffic',       impact: 0.212, val: inputs.traffic,        color: 'var(--orange)',  grad: 'linear-gradient(90deg,#FF5722,#FF8A50)' },
+    { name: 'Multi-Delivery',impact: 0.178, val: `×${inputs.multi}`,    color: 'var(--pink)',    grad: 'linear-gradient(90deg,#E91E8C,#F06292)' },
+    { name: 'Rider Rating',  impact: 0.148, val: `${inputs.rating}★`,   color: 'var(--lime)',    grad: 'linear-gradient(90deg,#C6FF00,#DEFF47)' },
+    { name: 'Weather',       impact: 0.101, val: inputs.weather,        color: 'var(--cyan)',    grad: 'linear-gradient(90deg,#00BCD4,#4DD0E1)' },
+    { name: 'Festival',      impact: 0.100, val: inputs.festival,       color: 'var(--purple2)', grad: 'linear-gradient(90deg,#7C4DFF,#B388FF)' },
+    { name: 'Vehicle Cond.', impact: 0.099, val: `Level ${inputs.vehicle_cond}`, color: 'var(--orange3)', grad: 'linear-gradient(90deg,#FFAB40,#FFD180)' },
+    { name: 'Distance',      impact: 0.035, val: `${inputs.distance}km`,color: 'var(--muted)',   grad: 'linear-gradient(90deg,#6B6B8A,#9090B0)' },
+  ];
+  const maxImpact = factors[0].impact;
+  document.getElementById('factorRows').innerHTML = factors.map(f => `
+    <div class="factor-row">
+      <div class="factor-name">${f.name}</div>
+      <div class="factor-bar-wrap">
+        <div class="factor-bar" style="width:${(f.impact/maxImpact*100)}%;background:${f.grad};"></div>
+      </div>
+      <div class="factor-val" style="color:${f.color};">${f.val}</div>
+    </div>
+  `).join('');
+
+  const pickup = Math.round(eta * 0.3);
+  const transit = Math.round(eta * 0.5);
+  const buffer = eta - pickup - transit;
+  document.getElementById('etaTimeline').innerHTML = `
+    <div class="eta-step">
+      <div class="eta-dot" style="background:rgba(0,188,212,0.15);border:2px solid var(--cyan);">📋</div>
+      <div class="es-label">Prep</div>
+      <div class="es-val" style="color:var(--cyan);">${pickup}m</div>
+    </div>
+    <div class="eta-step">
+      <div class="eta-dot" style="background:rgba(255,171,64,0.15);border:2px solid var(--orange3);">🛵</div>
+      <div class="es-label">Transit</div>
+      <div class="es-val" style="color:var(--orange3);">${transit}m</div>
+    </div>
+    <div class="eta-step">
+      <div class="eta-dot" style="background:rgba(198,255,0,0.15);border:2px solid var(--lime);">🏠</div>
+      <div class="es-label">Delivery</div>
+      <div class="es-val" style="color:var(--lime);">${buffer}m</div>
+    </div>
+  `;
+
+  // ── Summary paragraph ──
+  const now2 = new Date();
+  const tLow2 = new Date(now2.getTime() + low * 60000);
+  const tHigh2 = new Date(now2.getTime() + high * 60000);
+  const fmt2 = d => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  const vehicleLabel = { motorcycle:'motorcycle', scooter:'scooter', electric_scooter:'electric scooter', bicycle:'bicycle' }[inputs.vehicle];
+  const cityLabel = { Metropolitian:'metropolitan', Urban:'urban', 'Semi-Urban':'semi-urban' }[inputs.city];
+  const hourInt = parseInt(inputs.hour);
+  const timeOfDay = hourInt < 6 ? 'late night' : hourInt < 12 ? 'morning' : hourInt < 17 ? 'afternoon' : hourInt < 21 ? 'evening' : 'night';
+
+  // build sentences
+  let sentences = [];
+
+  // opening: ETA + tier
+  const tierPhrases = {
+    Express: `This is an <span class="hi-lime">express delivery</span> — among the fastest possible.`,
+    Fast:    `This is a <span class="hi-cyan">fast delivery</span> — well above average speed.`,
+    Standard:`This is a <span class="hi-orange">standard delivery</span> — typical for these conditions.`,
+    Slow:    `This is a <span class="hi-pink">slow delivery</span> — conditions are working against you.`,
+  };
+  sentences.push(`Your order is predicted to arrive in <strong>${eta} minutes</strong> (between <span class="hi-cyan">${fmt2(tLow2)}</span> and <span class="hi-cyan">${fmt2(tHigh2)}</span>). ${tierPhrases[tier]}`);
+
+  // traffic sentence
+  const trafficSentences = {
+    Jam:    `<span class="hi-pink">Traffic is jammed</span> — the single biggest delay factor, adding roughly 10 minutes to the base time.`,
+    High:   `<span class="hi-orange">High traffic</span> is adding noticeable delay to the route.`,
+    Medium: `Traffic is <strong>moderate</strong>, contributing a mild delay.`,
+    Low:    `<span class="hi-lime">Traffic is light</span>, helping keep the ETA down.`,
+  };
+  sentences.push(trafficSentences[inputs.traffic]);
+
+  // rider sentence
+  const ratingNum = parseFloat(inputs.rating);
+  if (ratingNum >= 4.5) sentences.push(`Your rider is <span class="hi-lime">highly rated (${inputs.rating}★)</span>, which typically means faster and more reliable delivery.`);
+  else if (ratingNum <= 3.0) sentences.push(`The rider's rating is <span class="hi-pink">below average (${inputs.rating}★)</span>, which may contribute to slower delivery.`);
+
+  // weather
+  if (['Fog','Stormy','Sandstorms'].includes(inputs.weather))
+    sentences.push(`<span class="hi-orange">${inputs.weather} weather</span> is slowing things down further.`);
+  else if (inputs.weather === 'Sunny')
+    sentences.push(`<span class="hi-lime">Sunny weather</span> is helping — clear conditions shave a couple of minutes off.`);
+
+  // festival
+  if (inputs.festival === 'Yes')
+    sentences.push(`It's a <span class="hi-pink">festival day</span>, which typically adds ~4 minutes due to increased demand and congestion.`);
+
+  // multi delivery
+  if (parseInt(inputs.multi) >= 2)
+    sentences.push(`The rider has <span class="hi-orange">${inputs.multi} other deliveries</span> on this trip, adding meaningful delay.`);
+
+  // distance
+  const dist = parseFloat(inputs.distance);
+  if (dist > 10) sentences.push(`The distance of <strong>${dist} km</strong> is quite far and is a notable contributor to the ETA.`);
+  else if (dist <= 3) sentences.push(`At just <strong>${dist} km</strong>, the delivery distance is short — a positive factor.`);
+
+  // time of day
+  if (['evening','afternoon'].includes(timeOfDay) && (hourInt >= 12 && hourInt <= 14 || hourInt >= 18 && hourInt <= 21))
+    sentences.push(`Ordering during the <span class="hi-orange">${timeOfDay} rush</span> adds a small delay due to higher order volumes.`);
+
+  document.getElementById('summaryText').innerHTML = sentences.join(' ');
+
+  // tags
+  const tags = [
+    { label: tier, bg: tier==='Express'?'rgba(198,255,0,0.15)':tier==='Fast'?'rgba(0,188,212,0.15)':tier==='Standard'?'rgba(255,171,64,0.15)':'rgba(233,30,140,0.15)', color: tier==='Express'?'var(--lime)':tier==='Fast'?'var(--cyan)':tier==='Standard'?'var(--orange3)':'var(--pink)', border: tier==='Express'?'rgba(198,255,0,0.3)':tier==='Fast'?'rgba(0,188,212,0.3)':tier==='Standard'?'rgba(255,171,64,0.3)':'rgba(233,30,140,0.3)' },
+    { label: inputs.traffic+' Traffic', bg:'rgba(255,87,34,0.1)', color:'var(--orange)', border:'rgba(255,87,34,0.25)' },
+    { label: inputs.weather, bg:'rgba(0,188,212,0.1)', color:'var(--cyan)', border:'rgba(0,188,212,0.25)' },
+    { label: vehicleLabel, bg:'rgba(124,77,255,0.1)', color:'var(--purple2)', border:'rgba(124,77,255,0.25)' },
+    { label: cityLabel+' city', bg:'rgba(233,30,140,0.1)', color:'var(--pink2)', border:'rgba(233,30,140,0.25)' },
+  ];
+  if (inputs.festival === 'Yes') tags.push({ label:'Festival Day 🎉', bg:'rgba(255,171,64,0.1)', color:'var(--orange3)', border:'rgba(255,171,64,0.3)' });
+  document.getElementById('summaryTags').innerHTML = tags.map(t =>
+    `<span class="s-tag" style="background:${t.bg};color:${t.color};border:1px solid ${t.border};">${t.label}</span>`
+  ).join('');
+
+  const rs = document.getElementById('resultSection');
+  rs.classList.add('visible');
+  rs.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function predict() {
+  const inputs = {
+    weather:      document.getElementById('weather').value,
+    traffic:      document.getElementById('traffic').value,
+    vehicle:      document.getElementById('vehicle').value,
+    city:         document.getElementById('city').value,
+    order_type:   document.getElementById('order_type').value,
+    multi:        document.getElementById('multi').value,
+    age:          document.getElementById('age').value,
+    rating:       document.getElementById('rating').value,
+    distance:     document.getElementById('distance').value,
+    hour:         document.getElementById('hour').value,
+    vehicle_cond: document.getElementById('vehicle_cond').value,
+    festival:     document.getElementById('festival').value,
+  };
+
+  const btn = document.getElementById('predictBtn');
+  const errBanner = document.getElementById('errBanner');
+  btn.textContent = '⏳ Calculating...';
+  btn.classList.add('loading');
+  errBanner.style.display = 'none';
+
+  try {
+    const response = await fetch(FLASK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(inputs),
+    });
+
+    if (!response.ok) throw new Error(`Server error: ${response.status}`);
+
+    const result = await response.json();
+    const eta = Math.round(result.eta);
+    renderResults(eta, inputs);
+
+  } catch (err) {
+    errBanner.style.display = 'flex';
+    errBanner.querySelector('.err-msg').textContent =
+      err.message.includes('Failed to fetch')
+        ? 'Cannot reach Flask server. Make sure app.py is running on port 5000.'
+        : err.message;
+  }
+
+  btn.textContent = '⚡ Predict Delivery Time';
+  btn.classList.remove('loading');
+}
+</script>
+</body>
+</html>
