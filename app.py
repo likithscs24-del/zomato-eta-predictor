@@ -87,6 +87,7 @@ def predict():
     required = ['age', 'rating', 'weather', 'traffic', 'vehicle_cond',
                 'order_type', 'vehicle', 'multi', 'festival', 'city',
                 'distance', 'hour', 'region']
+    
     missing = [k for k in required if k not in data]
     if missing:
         return jsonify({'error': f'Missing fields: {missing}'}), 400
@@ -107,20 +108,29 @@ def predict():
 
     eta = max(10, round(raw))
 
-    # ── Prediction interval using MAE as a symmetric ±bound ───────────────────
-    # For tree ensembles we also try per-tree std if available
+    # ── Prediction interval logic ───────────────────
+    # Initial fallback using MAE
     low  = max(10, round(raw - MODEL_MAE))
     high = min(54, round(raw + MODEL_MAE))
 
     if hasattr(model, 'estimators_'):
-        # Random Forest → use std of individual tree predictions for tighter interval
+        # Random Forest → use std of individual tree predictions
         try:
             tree_preds = np.array([e.predict(features)[0] for e in model.estimators_])
             std = float(np.std(tree_preds))
+            # Logic Fix: Ensure high is at least 2 minutes more than low
             low  = max(10, round(raw - std))
-            high = min(54, round(raw + std))
+            high = max(low + 2, min(54, round(raw + std)))
         except Exception:
-            pass  # fall back to MAE interval
+            pass 
+
+    # ── SUCCESS: Return the data the Frontend expects ────────────────────────
+    return jsonify({
+        "eta": eta,
+        "low": low,
+        "high": high,
+        "region_delta": region_delta  # Added this to prevent Frontend errors
+    })
 
     return jsonify({
         'eta':    eta,
